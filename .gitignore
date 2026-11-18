@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Storage & Temporary Files
+uploads/*
+!uploads/.gitkeep
+outputs/clips/*
+!outputs/clips/.gitkeep
+outputs/subtitles/*
+!outputs/subtitles/.gitkeep
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

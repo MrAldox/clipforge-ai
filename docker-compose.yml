@@ -1,0 +1,19 @@
+services:
+  clipforge:
+    build: .
+    container_name: clipforge-ai
+    ports:
+      - "7860:7860"
+    environment:
+      - PORT=7860
+      - LOW_MEMORY_MODE=true
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-}
+    volumes:
+      - ./uploads:/home/user/app/uploads
+      - ./outputs:/home/user/app/outputs
+    restart: unless-stopped
