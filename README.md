@@ -1,3 +1,13 @@
+---
+title: ClipForge AI
+emoji: 🎬
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🎬 ClipForge AI - Generador Automático de Clips Virales (9:16)
 
 > Convierte videos largos y streams de YouTube en **clips verticales (9:16) con ganchos virales y subtítulos animados estilo Alex Hormozi / TikTok**, 100% gratis y de código abierto.
