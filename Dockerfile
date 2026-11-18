@@ -40,5 +40,5 @@ RUN mkdir -p uploads outputs/clips outputs/subtitles
 
 EXPOSE 7860
 
-# Run FastAPI with uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Run FastAPI with uvicorn respecting Render's dynamic PORT
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}"]
