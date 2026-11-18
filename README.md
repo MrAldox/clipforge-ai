@@ -1,5 +1,5 @@
 ---
-title: ClipForge AI
+title: ClipingHARD
 emoji: 🎬
 colorFrom: indigo
 colorTo: purple
