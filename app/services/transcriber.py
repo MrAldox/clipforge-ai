@@ -130,7 +130,7 @@ class TranscriberService:
         Asegúrate de incluir marcas de tiempo precisas en segundos para cada segmento y palabras claves. Responde ÚNICAMENTE el JSON.
         """
 
-        models_to_try = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+        models_to_try = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash']
         last_err = None
         data = None
         for model_name in models_to_try:

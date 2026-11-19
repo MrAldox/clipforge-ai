@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Any
 from google import genai
 from google.genai import types
 from groq import Groq
@@ -25,19 +25,21 @@ Transcripción con marcas de tiempo (inicio en segundos - fin en segundos):
 {transcript_text}
 ---
 
-Responde ÚNICAMENTE en formato JSON con la siguiente estructura (sin bloques markdown adicionales fuera del json):
-[
-  {{
-    "title": "Título llamativo para el clip (máx 8 palabras)",
-    "hook": "La frase exacta con la que arranca el clip para enganchar al espectador",
-    "start_time": 12.5,
-    "end_time": 47.0,
-    "virality_score": 94,
-    "virality_reason": "Por qué este momento tiene alto potencial (ej. genera curiosidad inmediata y remata con un chiste inesperado)",
-    "suggested_caption": "Descripción lista para copiar y pegar para Shorts/TikTok con llamada a la acción",
-    "hashtags": ["#shorts", "#fyp", "#viral", "#podcast"]
-  }}
-]
+Responde ÚNICAMENTE un objeto JSON válido con la clave "clips" conteniendo la lista de momentos (sin bloques markdown ni texto adicional fuera del JSON):
+{{
+  "clips": [
+    {{
+      "title": "Título llamativo para el clip (máx 8 palabras)",
+      "hook": "La frase exacta con la que arranca el clip para enganchar al espectador",
+      "start_time": 12.5,
+      "end_time": 47.0,
+      "virality_score": 94,
+      "virality_reason": "Por qué este momento tiene alto potencial (ej. genera curiosidad inmediata)",
+      "suggested_caption": "Descripción lista para copiar y pegar para Shorts/TikTok con llamada a la acción",
+      "hashtags": ["#shorts", "#fyp", "#viral", "#podcast"]
+    }}
+  ]
+}}
 """
 
 class AIAnalyzerService:
@@ -83,7 +85,7 @@ class AIAnalyzerService:
             transcript_text=transcript_formatted
         )
 
-        models_to_try = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+        models_to_try = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash']
         last_err = None
         for model_name in models_to_try:
             try:
@@ -127,10 +129,11 @@ class AIAnalyzerService:
         )
 
         models_to_try = [
-            "llama-3.1-8b-instant",       # 100% universal access on all free accounts & ultra fast
+            "llama-3.1-8b-instant",       # Universal access on all free accounts & ultra fast
+            "llama3-8b-8192",             # Stable 8B fallback
             "llama-3.3-70b-versatile",    # 70B if accessible
             "llama3-70b-8192",            # Fallback 70B
-            "mixtral-8x7b-32768"          # MoE fallback
+            "gemma2-9b-it"                # Gemma fallback
         ]
 
         last_err = None
@@ -148,17 +151,6 @@ class AIAnalyzerService:
 
                 content = chat_completion.choices[0].message.content
                 raw_json = json.loads(content)
-                
-                # Handle cases where json_object wraps array inside a key
-                if isinstance(raw_json, dict):
-                    for k in ["clips", "moments", "viral_moments", "results"]:
-                        if k in raw_json and isinstance(raw_json[k], list):
-                            raw_json = raw_json[k]
-                            break
-                    if isinstance(raw_json, dict):
-                        # If still a dict, see if values are a list
-                        raw_json = list(raw_json.values())[0] if raw_json else []
-
                 return self._parse_moments(raw_json)
             except Exception as e:
                 last_err = e
@@ -166,7 +158,16 @@ class AIAnalyzerService:
 
         raise last_err or RuntimeError("No se pudo analizar con ningún modelo de Groq.")
 
-    def _parse_moments(self, raw_list: list) -> List[ViralMoment]:
+    def _parse_moments(self, raw_input: Any) -> List[ViralMoment]:
+        raw_list = raw_input
+        if isinstance(raw_input, dict):
+            for k in ["clips", "moments", "viral_moments", "results"]:
+                if k in raw_input and isinstance(raw_input[k], list):
+                    raw_list = raw_input[k]
+                    break
+            if isinstance(raw_list, dict):
+                raw_list = list(raw_input.values())[0] if raw_input else []
+
         moments: List[ViralMoment] = []
         if not isinstance(raw_list, list):
             return moments
