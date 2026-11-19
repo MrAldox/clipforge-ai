@@ -83,17 +83,24 @@ class AIAnalyzerService:
             transcript_text=transcript_formatted
         )
 
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.7
-            )
-        )
-
-        raw_data = json.loads(response.text)
-        return self._parse_moments(raw_data)
+        models_to_try = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+        last_err = None
+        for model_name in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.7
+                    )
+                )
+                raw_data = json.loads(response.text)
+                return self._parse_moments(raw_data)
+            except Exception as e:
+                last_err = e
+                print(f"Gemini model '{model_name}' failed: {e}. Trying fallback...")
+        raise last_err or RuntimeError("No se pudo analizar con ningún modelo de Gemini.")
 
     def analyze_with_groq(
         self, 
@@ -119,30 +126,45 @@ class AIAnalyzerService:
             transcript_text=transcript_formatted
         )
 
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "Eres un asistente experto en edición de video y virales. Devuelve únicamente JSON válido."},
-                {"role": "user", "content": prompt}
-            ],
-            model="llama-3.3-70b-versatile",
-            response_format={"type": "json_object"},
-            temperature=0.7
-        )
+        models_to_try = [
+            "llama-3.1-8b-instant",       # 100% universal access on all free accounts & ultra fast
+            "llama-3.3-70b-versatile",    # 70B if accessible
+            "llama3-70b-8192",            # Fallback 70B
+            "mixtral-8x7b-32768"          # MoE fallback
+        ]
 
-        content = chat_completion.choices[0].message.content
-        raw_json = json.loads(content)
-        
-        # Handle cases where json_object wraps array inside a key
-        if isinstance(raw_json, dict):
-            for k in ["clips", "moments", "viral_moments", "results"]:
-                if k in raw_json and isinstance(raw_json[k], list):
-                    raw_json = raw_json[k]
-                    break
-            if isinstance(raw_json, dict):
-                # If still a dict, see if values are a list
-                raw_json = list(raw_json.values())[0] if raw_json else []
+        last_err = None
+        for model_name in models_to_try:
+            try:
+                chat_completion = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": "Eres un asistente experto en edición de video y virales. Devuelve únicamente JSON válido."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    model=model_name,
+                    response_format={"type": "json_object"},
+                    temperature=0.7
+                )
 
-        return self._parse_moments(raw_json)
+                content = chat_completion.choices[0].message.content
+                raw_json = json.loads(content)
+                
+                # Handle cases where json_object wraps array inside a key
+                if isinstance(raw_json, dict):
+                    for k in ["clips", "moments", "viral_moments", "results"]:
+                        if k in raw_json and isinstance(raw_json[k], list):
+                            raw_json = raw_json[k]
+                            break
+                    if isinstance(raw_json, dict):
+                        # If still a dict, see if values are a list
+                        raw_json = list(raw_json.values())[0] if raw_json else []
+
+                return self._parse_moments(raw_json)
+            except Exception as e:
+                last_err = e
+                print(f"Groq model '{model_name}' failed: {e}. Trying fallback model...")
+
+        raise last_err or RuntimeError("No se pudo analizar con ningún modelo de Groq.")
 
     def _parse_moments(self, raw_list: list) -> List[ViralMoment]:
         moments: List[ViralMoment] = []

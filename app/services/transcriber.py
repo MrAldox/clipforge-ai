@@ -130,16 +130,27 @@ class TranscriberService:
         Asegúrate de incluir marcas de tiempo precisas en segundos para cada segmento y palabras claves. Responde ÚNICAMENTE el JSON.
         """
 
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[uploaded_file, prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
-        )
-
-        import json
-        data = json.loads(response.text)
+        models_to_try = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+        last_err = None
+        data = None
+        for model_name in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[uploaded_file, prompt],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json"
+                    )
+                )
+                import json
+                data = json.loads(response.text)
+                break
+            except Exception as e:
+                last_err = e
+                print(f"Gemini transcription model '{model_name}' failed: {e}. Trying fallback...")
+        
+        if not data:
+            raise last_err or RuntimeError("No se pudo transcribir con Gemini.")
         
         segments: List[TranscriptSegment] = []
         for s in data.get("segments", []):
