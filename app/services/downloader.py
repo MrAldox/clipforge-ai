@@ -44,7 +44,13 @@ class DownloaderService:
                 'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
             },
             # Enable Node.js as JavaScript runtime for solving YouTube challenges
-            'js_runtimes': {'node': {}}
+            'js_runtimes': {'node': {}},
+            # Multi-client extraction to bypass YouTube SABR experiment and format-stripping
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['ios', 'android', 'mweb', 'web']
+                }
+            }
         }
 
         # Impersonate real Google Chrome TLS fingerprint to bypass datacenter IP blocks
