@@ -43,13 +43,8 @@ class DownloaderService:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
             },
-            # Crucial: Use Android client which bypasses datacenter bot detection reliably
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android'],
-                    'player_skip': ['webpage', 'configs']
-                }
-            }
+            # Enable Node.js as JavaScript runtime for solving YouTube challenges
+            'js_runtimes': {'node': {}}
         }
 
         # Inject ffmpeg directory if available
