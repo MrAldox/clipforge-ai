@@ -23,6 +23,7 @@ class Settings(BaseModel):
     # API Keys
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    YOUTUBE_COOKIES: str = os.getenv("YOUTUBE_COOKIES", "")
     
     # Cloudflare R2 / S3
     R2_ACCOUNT_ID: str = os.getenv("R2_ACCOUNT_ID", "")
@@ -65,3 +66,9 @@ settings = Settings(
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 settings.CLIPS_DIR.mkdir(parents=True, exist_ok=True)
 settings.SUBTITLES_DIR.mkdir(parents=True, exist_ok=True)
+
+# Write server cookies if provided in environment
+SERVER_COOKIES_FILE = settings.UPLOAD_DIR / "server_cookies.txt"
+if settings.YOUTUBE_COOKIES and settings.YOUTUBE_COOKIES.strip():
+    SERVER_COOKIES_FILE.write_text(settings.YOUTUBE_COOKIES.strip(), encoding="utf-8")
+

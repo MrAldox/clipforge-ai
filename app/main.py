@@ -44,10 +44,15 @@ async def serve_home(request: Request):
     )
 
 @app.get("/api/video-info")
-async def get_video_info(url: str):
-    """Extracts YouTube metadata to preview title and thumbnail before clipping."""
+async def get_video_info(url: str, cookies: Optional[str] = None):
+    """Extracts YouTube metadata safely without bot blocks."""
     try:
-        info = downloader.get_video_info(url)
+        temp_cookies_path = None
+        if cookies and cookies.strip():
+            temp_cookies_path = str(settings.UPLOAD_DIR / "temp_preview_cookies.txt")
+            with open(temp_cookies_path, "w", encoding="utf-8") as f:
+                f.write(cookies.strip())
+        info = downloader.get_video_info(url, cookies_path=temp_cookies_path)
         return info
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"No se pudo obtener información del video: {str(e)}")

@@ -122,7 +122,12 @@ document.addEventListener("DOMContentLoaded", () => {
         fetchInfoBtn.innerHTML = `<span class="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"></span> Cargando...`;
 
         try {
-            const res = await fetch(`/api/video-info?url=${encodeURIComponent(url)}`);
+            const cookies = localStorage.getItem("clipforge_cookies") || "";
+            let fetchUrl = `/api/video-info?url=${encodeURIComponent(url)}`;
+            if (cookies) {
+                fetchUrl += `&cookies=${encodeURIComponent(cookies)}`;
+            }
+            const res = await fetch(fetchUrl);
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || "Error al obtener video");
 
