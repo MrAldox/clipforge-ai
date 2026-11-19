@@ -47,6 +47,13 @@ class DownloaderService:
             'js_runtimes': {'node': {}}
         }
 
+        # Impersonate real Google Chrome TLS fingerprint to bypass datacenter IP blocks
+        try:
+            from yt_dlp.networking.impersonate import ImpersonateTarget
+            opts['impersonate'] = ImpersonateTarget.from_str('chrome')
+        except Exception:
+            pass
+
         # Inject ffmpeg directory if available
         if settings.FFMPEG_CMD and os.path.isfile(settings.FFMPEG_CMD):
             opts['ffmpeg_location'] = os.path.dirname(settings.FFMPEG_CMD)
