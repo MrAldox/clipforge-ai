@@ -110,8 +110,7 @@ class DownloaderService:
             'channel': channel
         }
 
-    def download_audio_from_youtube(self, url: str, job_id: str, cookies_path: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
-        """Downloads audio only (m4a/mp3) for ultra-fast transcription and minimal bandwidth."""
+    def _execute_audio_download(self, url: str, job_id: str, cookies_path: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
         target_path = str(self.upload_dir / f"{job_id}_audio.m4a")
         
         opts = self._get_yt_dlp_options(cookies_path)
@@ -125,36 +124,46 @@ class DownloaderService:
             }],
         })
 
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                
-                # Find the actual downloaded file
-                actual_file = target_path
-                if not os.path.exists(actual_file):
-                    for f in self.upload_dir.glob(f"{job_id}_audio.*"):
-                        actual_file = str(f)
-                        break
-                        
-                metadata = {
-                    'id': info.get('id', job_id) if info else job_id,
-                    'title': info.get('title', 'Video') if info else 'Video',
-                    'duration': info.get('duration', 0) if info else 0,
-                    'thumbnail': info.get('thumbnail', '') if info else ''
-                }
-                return actual_file, metadata
-        except Exception as e:
-            err_str = str(e)
-            if any(k in err_str for k in ["Sign in to confirm you’re not a bot", "Requested format is not available", "429"]):
-                raise RuntimeError(
-                    "YouTube bloqueó la descarga en este servidor. "
-                    "Soluciones inmediatas: "
-                    "1) Sube el video directamente en la pestaña 'Subir Video (MP4 / MOV)', o "
-                    "2) Abre 'Configurar APIs' y pega tus cookies de YouTube (exportadas con la extensión 'Get cookies.txt')."
-                )
-            raise
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            
+            actual_file = target_path
+            if not os.path.exists(actual_file):
+                for f in self.upload_dir.glob(f"{job_id}_audio.*"):
+                    actual_file = str(f)
+                    break
+                    
+            metadata = {
+                'id': info.get('id', job_id) if info else job_id,
+                'title': info.get('title', 'Video') if info else 'Video',
+                'duration': info.get('duration', 0) if info else 0,
+                'thumbnail': info.get('thumbnail', '') if info else ''
+            }
+            return actual_file, metadata
 
-    def download_video_section(
+    def download_audio_from_youtube(self, url: str, job_id: str, cookies_path: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
+        """
+        Downloads audio with smart dual-fallback:
+        If download with cookies triggers YouTube SABR format filtering,
+        it automatically retries without cookies (and vice versa).
+        """
+        first_attempt_cookies = cookies_path
+        second_attempt_cookies = None if cookies_path else (str(self.upload_dir / "server_cookies.txt") if (self.upload_dir / "server_cookies.txt").exists() else None)
+
+        try:
+            return self._execute_audio_download(url, job_id, cookies_path=first_attempt_cookies)
+        except Exception as e1:
+            print(f"Primary audio download attempt failed ({e1}). Attempting alternative mode...")
+            try:
+                return self._execute_audio_download(url, job_id, cookies_path=second_attempt_cookies)
+            except Exception as e2:
+                err_str = f"{e1} | {e2}"
+                raise RuntimeError(
+                    f"Error descargando audio de YouTube: {str(e2)}. "
+                    "Usa la pestaña 'Subir Video (MP4 / MOV)' para procesar el clip directamente."
+                )
+
+    def _execute_video_section_download(
         self, 
         url: str, 
         start_time: float, 
@@ -162,10 +171,6 @@ class DownloaderService:
         output_path: str,
         cookies_path: Optional[str] = None
     ) -> str:
-        """
-        Downloads only the specified segment using yt-dlp download-sections.
-        Saves 90%+ bandwidth & CPU by avoiding downloading the entire stream.
-        """
         video_format = 'bv*[height<=720]+ba/b[height<=720]/best' if settings.LOW_MEMORY_MODE else 'bv*[height<=1080]+ba/b[height<=1080]/best'
         
         opts = self._get_yt_dlp_options(cookies_path)
@@ -178,18 +183,36 @@ class DownloaderService:
             'overwrites': True,
         })
 
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.download([url])
+        return output_path
+
+    def download_video_section(
+        self, 
+        url: str, 
+        start_time: float, 
+        end_time: float, 
+        output_path: str,
+        cookies_path: Optional[str] = None
+    ) -> str:
+        """
+        Downloads section with smart dual-fallback:
+        If section cut with cookies hits SABR limitations, retries without cookies.
+        """
+        first_cookies = cookies_path
+        second_cookies = None if cookies_path else (str(self.upload_dir / "server_cookies.txt") if (self.upload_dir / "server_cookies.txt").exists() else None)
+
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
-            return output_path
-        except Exception as e:
-            err_str = str(e)
-            if any(k in err_str for k in ["Sign in to confirm you’re not a bot", "Requested format is not available", "429"]):
+            return self._execute_video_section_download(url, start_time, end_time, output_path, cookies_path=first_cookies)
+        except Exception as e1:
+            print(f"Primary section download failed ({e1}). Attempting alternative mode...")
+            try:
+                return self._execute_video_section_download(url, start_time, end_time, output_path, cookies_path=second_cookies)
+            except Exception as e2:
                 raise RuntimeError(
-                    "YouTube bloqueó la descarga de este segmento. "
-                    "Sube el archivo de video en la pestaña 'Subir Video' para recortarlo sin restricciones de IP."
+                    f"Error descargando fragmento de video: {str(e2)}. "
+                    "Prueba subiendo el video directamente en 'Subir Video'."
                 )
-            raise
 
     def extract_audio_from_local_file(self, video_path: str, output_audio_path: str) -> str:
         """Extracts 128k audio from a local video file using ffmpeg."""
