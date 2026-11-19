@@ -11,6 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Install system dependencies: FFmpeg, libass, fonts for subtitles
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    nodejs \
     fonts-liberation \
     fontconfig \
     ca-certificates \

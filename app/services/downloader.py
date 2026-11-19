@@ -14,6 +14,12 @@ class DownloaderService:
         self.upload_dir = settings.UPLOAD_DIR
         self.clips_dir = settings.CLIPS_DIR
 
+        # Ensure ffmpeg binary directory is in PATH for yt-dlp
+        if settings.FFMPEG_CMD and os.path.isfile(settings.FFMPEG_CMD):
+            ff_dir = os.path.dirname(settings.FFMPEG_CMD)
+            if ff_dir and ff_dir not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = ff_dir + os.pathsep + os.environ.get("PATH", "")
+
     def _extract_video_id(self, url: str) -> Optional[str]:
         """Extracts YouTube 11-char video ID from various URL patterns."""
         patterns = [
@@ -37,14 +43,18 @@ class DownloaderService:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
             },
-            # Crucial: Use Android and iOS clients which bypass datacenter bot detection
+            # Crucial: Use Android client which bypasses datacenter bot detection reliably
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'ios', 'web_embedded', 'web'],
+                    'player_client': ['android'],
                     'player_skip': ['webpage', 'configs']
                 }
             }
         }
+
+        # Inject ffmpeg directory if available
+        if settings.FFMPEG_CMD and os.path.isfile(settings.FFMPEG_CMD):
+            opts['ffmpeg_location'] = os.path.dirname(settings.FFMPEG_CMD)
 
         # Check for cookies (passed explicitly or saved on server)
         server_cookies = self.upload_dir / "server_cookies.txt"
@@ -111,7 +121,7 @@ class DownloaderService:
         
         opts = self._get_yt_dlp_options(cookies_path)
         opts.update({
-            'format': 'ba[ext=m4a]/ba/b',
+            'format': 'ba/b/best',
             'outtmpl': str(self.upload_dir / f"{job_id}_audio.%(ext)s"),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
@@ -140,9 +150,9 @@ class DownloaderService:
                 return actual_file, metadata
         except Exception as e:
             err_str = str(e)
-            if "Sign in to confirm you’re not a bot" in err_str or "429" in err_str:
+            if any(k in err_str for k in ["Sign in to confirm you’re not a bot", "Requested format is not available", "429"]):
                 raise RuntimeError(
-                    "YouTube bloqueó la descarga en este servidor solicitando verificación de bot. "
+                    "YouTube bloqueó la descarga en este servidor. "
                     "Soluciones inmediatas: "
                     "1) Sube el video directamente en la pestaña 'Subir Video (MP4 / MOV)', o "
                     "2) Abre 'Configurar APIs' y pega tus cookies de YouTube (exportadas con la extensión 'Get cookies.txt')."
@@ -161,7 +171,7 @@ class DownloaderService:
         Downloads only the specified segment using yt-dlp download-sections.
         Saves 90%+ bandwidth & CPU by avoiding downloading the entire stream.
         """
-        video_format = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best' if settings.LOW_MEMORY_MODE else 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best'
+        video_format = 'bv*[height<=720]+ba/b[height<=720]/best' if settings.LOW_MEMORY_MODE else 'bv*[height<=1080]+ba/b[height<=1080]/best'
         
         opts = self._get_yt_dlp_options(cookies_path)
         opts.update({
@@ -179,7 +189,7 @@ class DownloaderService:
             return output_path
         except Exception as e:
             err_str = str(e)
-            if "Sign in to confirm you’re not a bot" in err_str or "429" in err_str:
+            if any(k in err_str for k in ["Sign in to confirm you’re not a bot", "Requested format is not available", "429"]):
                 raise RuntimeError(
                     "YouTube bloqueó la descarga de este segmento. "
                     "Sube el archivo de video en la pestaña 'Subir Video' para recortarlo sin restricciones de IP."
