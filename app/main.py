@@ -3,6 +3,7 @@ import shutil
 import uuid
 import asyncio
 from pathlib import Path
+from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
