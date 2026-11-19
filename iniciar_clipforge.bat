@@ -27,5 +27,5 @@ echo Abre tu navegador y procesa tus videos sin problemas.
 echo Presiona CTRL + C en esta ventana para detener el servidor.
 echo.
 
-venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 7860
+venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 7860 --reload
 pause
